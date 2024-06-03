@@ -1,31 +1,38 @@
-using System.Collections;
-using System.Collections.Generic;
+using System.IO;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class MainManager : MonoBehaviour
 {
+    public static MainManager Instance;
+
     public Brick BrickPrefab;
     public int LineCount = 6;
     public Rigidbody Ball;
 
     public Text ScoreText;
+    public Text HighScoreText;
     public GameObject GameOverText;
-    
+    public GameObject NewHighScoreText;
+    public TMP_InputField PlayerNameInput;
+
     private bool m_Started = false;
     private int m_Points;
-    
-    private bool m_GameOver = false;
 
-    
+    public bool m_GameOver = false;
+
+    private int HighScore;
+    public string PlayerName = "";
+
     // Start is called before the first frame update
     void Start()
     {
         const float step = 0.6f;
         int perLine = Mathf.FloorToInt(4.0f / step);
-        
-        int[] pointCountArray = new [] {1,1,2,2,5,5};
+
+        int[] pointCountArray = new[] { 1, 1, 2, 2, 5, 5 };
         for (int i = 0; i < LineCount; ++i)
         {
             for (int x = 0; x < perLine; ++x)
@@ -36,6 +43,8 @@ public class MainManager : MonoBehaviour
                 brick.onDestroyed.AddListener(AddPoint);
             }
         }
+        LoadHighScore();
+        UpdateHighScoreText();
     }
 
     private void Update()
@@ -51,6 +60,14 @@ public class MainManager : MonoBehaviour
 
                 Ball.transform.SetParent(null);
                 Ball.AddForce(forceDir * 2.0f, ForceMode.VelocityChange);
+            }
+        }
+        else if (NewHighScoreText.activeSelf && m_GameOver)
+        {
+            if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return))
+            {
+                SubmitName();
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
         }
         else if (m_GameOver)
@@ -71,6 +88,61 @@ public class MainManager : MonoBehaviour
     public void GameOver()
     {
         m_GameOver = true;
-        GameOverText.SetActive(true);
+        if (m_Points > HighScore)
+        {
+            HighScore = m_Points;
+            NewHighScoreText.SetActive(true);
+            PlayerNameInput.gameObject.SetActive(true);
+            PlayerNameInput.ActivateInputField();
+        }
+        else
+        {
+            GameOverText.SetActive(true);
+        }
+    }
+
+    [System.Serializable]
+    class SaveData
+    {
+        public int HighScore;
+        public string PlayerName;
+    }
+
+    // Method to be called when the player submits their name
+    public void SubmitName()
+    {
+        string playerName = PlayerNameInput.text;
+        int highScore = HighScore;
+        SaveHighScore(playerName, highScore);
+        NewHighScoreText.SetActive(false);
+    }
+
+    public void SaveHighScore(string PlayerName, int HighScore)
+    {
+        SaveData data = new SaveData();
+        data.PlayerName = PlayerName;
+        data.HighScore = HighScore;
+
+        string json = JsonUtility.ToJson(data);
+        File.WriteAllText(Path.Combine(Application.persistentDataPath, "savefile.json"), json);
+    }
+
+    public void LoadHighScore()
+    {
+        string path = Path.Combine(Application.persistentDataPath, "savefile.json");
+        if (File.Exists(path))
+        {
+            string json = File.ReadAllText(path);
+            SaveData data = JsonUtility.FromJson<SaveData>(json);
+
+            HighScore = data.HighScore;
+            PlayerName = data.PlayerName;
+        }
+        UpdateHighScoreText();
+    }
+
+    private void UpdateHighScoreText()
+    {
+        HighScoreText.text = $"Player: {PlayerName} : High Score: {HighScore}";
     }
 }
